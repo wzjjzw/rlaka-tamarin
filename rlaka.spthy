@@ -1,0 +1,539 @@
+theory RLAKA_Complete_Verification
+begin
+
+builtins: hashing
+
+functions: Xor/2
+functions: PUF/1 [private]
+functions: h/1, hprime/1
+
+/* ==============================================
+   一、系统初始化
+   ============================================== */
+
+rule RC_Init:
+    [ Fr(~sk_RC), Fr(~pk_RC) ]
+    --[ RC_Initialized(~sk_RC, ~pk_RC) ]->
+    [ !RC_Keys(~sk_RC, ~pk_RC) ]
+
+rule Factory_Init:
+    [ Fr(~sk_F), Fr(~pk_F), Fr(~ID_F) ]
+    --[ Factory_Initialized(~ID_F, ~sk_F, ~pk_F) ]->
+    [ !Factory_Keys(~ID_F, ~sk_F, ~pk_F) ]
+
+/* ==============================================
+   二、设备注册阶段
+   ============================================== */
+
+rule R1_SD_A_To_Factory:
+    [ Fr(~sk_A), Fr(~pk_A) ]
+    --[ SD_A_Registered_Action(~sk_A) ]->
+    [ !SD_A_Keys(~sk_A, ~pk_A),
+      Out(<~pk_A>) ]
+
+rule R2_Factory_To_RC:
+    let
+        T_FA = ~T_FA
+        Sig_F = h(<sk_F, pk_A, ID_F, T_FA>)
+    in
+    [ In(<pk_A>),
+      !Factory_Keys(ID_F, sk_F, pk_F),
+      Fr(~T_FA) ]
+    --[ Factory_Signed_Action(ID_F) ]->
+    [ Out(<pk_A, ID_F, T_FA, Sig_F>) ]
+
+rule R3_RC_To_SD_A:
+    let
+        T_RA = ~T_RA
+        ID_A = ~ID_A
+        TID_A = ~TID_A
+        CA_1 = ~CA_1
+        CA_2 = ~CA_2
+        Sig_RC = h(<sk_RC, ID_A, TID_A, CA_1, CA_2, T_RA>)
+    in
+    [ In(<pk_A, ID_F, T_FA, Sig_F>),
+      !RC_Keys(sk_RC, pk_RC),
+      Fr(~T_RA), Fr(~ID_A), Fr(~TID_A), Fr(~CA_1), Fr(~CA_2) ]
+    --[ RC_Issued_Action(ID_A, TID_A) ]->
+    [ !RC_DB(ID_A, TID_A, CA_1, CA_2),
+      Out(<ID_A, TID_A, CA_1, CA_2, T_RA, Sig_RC>) ]
+
+rule R4_SD_A_Response:
+    let
+        RA_1 = PUF(CA_1)
+        RA_2 = PUF(CA_2)
+        HA_1 = h(<CA_1, RA_1>)
+        HA_2 = h(<CA_2, RA_2>)
+        C_A = CA_1
+        MN_A = Xor(RA_1, ID_A)
+        T_A = ~T_A
+        Sig_A = h(<sk_A, HA_1, HA_2, ID_A, TID_A, T_A>)
+    in
+    [ In(<ID_A, TID_A, CA_1, CA_2, T_RA, Sig_RC>),
+      !SD_A_Keys(sk_A, pk_A),
+      Fr(~T_A) ]
+    --[ SD_A_Stored_Action(ID_A) ]->
+    [ !SD_A_Storage(ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2),
+      !PUF_CRP(CA_1, RA_1),
+      !PUF_CRP(CA_2, RA_2),
+      Out(<HA_1, HA_2, ID_A, TID_A, T_A, Sig_A>) ]
+
+rule R5_RC_Complete:
+    [ In(<HA_1, HA_2, ID_A, TID_A, T_A, Sig_A>),
+      !RC_DB(ID_A, TID_A, CA_1, CA_2) ]
+    --[ Registration_Done_Action(ID_A) ]->
+    [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
+
+/* ==============================================
+   三、上传与授权阶段
+   ============================================== */
+
+rule RC_To_CSC:
+    [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
+    --[ CSC_Got_Action(ID_A) ]->
+    [ !CSC_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
+
+rule CSC_To_GWN:
+    [ !CSC_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
+    --[ GWN_Got_Action(ID_A) ]->
+    [ !GWN_DB(ID_A, TID_A, $none, $none, CA_1, HA_1, CA_2, HA_2) ]
+
+/* ==============================================
+   四、SD_B 注册
+   ============================================== */
+
+rule SD_B_Registration:
+    [ Fr(~ID_B), Fr(~CB_1), Fr(~CB_2), Fr(~AttrSet_B) ]
+    --[ SD_B_Registered_Action(~ID_B) ]->
+    [ !SD_B_Storage(~ID_B, ~CB_1, ~CB_2, ~AttrSet_B) ]
+
+rule GWN_Store_SD_B:
+    let
+        RB_1 = PUF(CB_1)
+        RB_2 = PUF(CB_2)
+        HB_1 = h(<CB_1, RB_1>)
+        HB_2 = h(<CB_2, RB_2>)
+    in
+    [ !SD_B_Storage(ID_B, CB_1, CB_2, AttrSet_B) ]
+    --[ GWN_Stored_SD_B_Action(ID_B) ]->
+    [ !GWN_DB_B(ID_B, CB_1, HB_1, CB_2, HB_2, AttrSet_B),
+      !PUF_CRP(CB_1, RB_1),
+      !PUF_CRP(CB_2, RB_2) ]
+
+/* ==============================================
+   五、认证与密钥协商阶段
+   ============================================== */
+
+rule A1_SD_A_Send_Msg1:
+    let
+        R_A = PUF(C_A)
+        ID_A_recovered = Xor(R_A, MN_A)
+        r1 = ~r1
+        T1 = ~T1
+        Target_AttrSet = 'sensor_attr'
+        L1 = Xor(<r1, Target_AttrSet>, h(<ID_A_recovered, TID_A, T1>))
+        M1 = h(<r1, Target_AttrSet, ID_A_recovered, TID_A, T1>)
+    in
+    [ !SD_A_Storage(ID_A, TID_A, C_A, MN_A, CA_i, HA_i, CA_other, HA_other),
+      !GWN_DB(ID_A_recovered, TID_A, TID_A_old, T_A, CA_i_db, HA_i_db, CA_other_db, HA_other_db),
+      Fr(~r1), Fr(~T1) ]
+    --[ A1_Sent_Action(ID_A_recovered),
+         TID_Used(ID_A_recovered, TID_A) ]->
+    [ !Session_A1(ID_A_recovered, TID_A, ~r1, ~T1),
+      Out(<M1, L1, T1, TID_A>) ]
+
+rule A2_GWN_Case1_Normal:
+    let
+        recovered = Xor(L1, h(<ID_A, TID_A, T1>))
+        M1_calc = h(<recovered, ID_A, TID_A, T1>)
+        PA_i = h(<HA_i, ID_A, T1>)
+        T2 = ~T2
+        left2 = <recovered, TID_A, CA_i, PA_i>
+        right2 = h(<HB_j, T2, ID_B>)
+        L2 = Xor(left2, right2)
+        M2 = h(<recovered, TID_A, CA_i, PA_i, HB_j, T2, ID_B>)
+        TID_A_new = h(<HA_i, ID_A, T1>)
+    in
+    [ In(<M1, L1, T1, TID_A>),
+      !Session_A1(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A, TID_A_old, T_A, CA_i, HA_i, CA_other, HA_other),
+      !GWN_DB_B(ID_B, CB_j, HB_j, CB_other, HB_other, AttrSet_B),
+      Fr(~T2) ]
+    --[ Eq(M1, M1_calc),
+         A2_M1_Verified(ID_A),
+         A2_Forwarded_Action(ID_A),
+         Case1_Normal(ID_A),
+         TID_Linked(ID_A, TID_A, TID_A_new) ]->
+    [ !Session_A2(ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i),
+      !Session_A1_Used(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A_new, TID_A, T2, CA_other, HA_other, $none, $none),
+      !GWN_DB_B(ID_B, CB_other, HB_other, $none, $none, AttrSet_B),
+      Out(<CB_j, L2, T2, M2>) ]
+
+rule A2_GWN_Case2_OldAccept:
+    let
+        recovered = Xor(L1, h(<ID_A, TID_A, T1>))
+        M1_calc = h(<recovered, ID_A, TID_A, T1>)
+        PA_i = h(<HA_i, ID_A, T1>)
+        T2 = ~T2
+        left2 = <recovered, TID_A, CA_i, PA_i>
+        right2 = h(<HB_j, T2, ID_B>)
+        L2 = Xor(left2, right2)
+        M2 = h(<recovered, TID_A, CA_i, PA_i, HB_j, T2, ID_B>)
+    in
+    [ In(<M1, L1, T1, TID_A>),
+      !Session_A1(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A_new_stored, TID_A, T_A, CA_i, HA_i, CA_other, HA_other),
+      !GWN_DB_B(ID_B, CB_j, HB_j, CB_other, HB_other, AttrSet_B),
+      Fr(~T2) ]
+    --[ Eq(M1, M1_calc),
+         TimeWindow(T1, T_A),
+         A2_M1_Verified(ID_A),
+         A2_Forwarded_Action(ID_A),
+         Case2_OldUsed(ID_A) ]->
+    [ !Session_A2(ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i),
+      !Session_A1_Used(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A_new_stored, TID_A, T_A, CA_other, HA_other, $none, $none),
+      !GWN_DB_B(ID_B, CB_other, HB_other, $none, $none, AttrSet_B),
+      Out(<CB_j, L2, T2, M2>) ]
+
+rule A2_GWN_Case2_OldReject:
+    let
+        recovered = Xor(L1, h(<ID_A, TID_A, T1>))
+        M1_calc = h(<recovered, ID_A, TID_A, T1>)
+    in
+    [ In(<M1, L1, T1, TID_A>),
+      !Session_A1(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A_new_stored, TID_A, T_A, CA_i, HA_i, CA_other, HA_other) ]
+    --[ Eq(M1, M1_calc),
+         NotTimeWindow(T1, T_A),
+         A2_Terminated_Action(ID_A),
+         Case2_OldRejected(ID_A) ]->
+    [ !Auth_Fail_Record(ID_A, TID_A),
+      !Session_A1_Used(ID_A, TID_A, r1_old, T1_old) ]
+
+rule A2_GWN_Case3_Terminate:
+    let
+        recovered = Xor(L1, h(<ID_A, TID_A, T1>))
+        M1_calc = h(<recovered, ID_A, TID_A, T1>)
+    in
+    [ In(<M1, L1, T1, TID_A>),
+      !Session_A1(ID_A, TID_A, r1_old, T1_old),
+      !GWN_DB(ID_A, TID_A_new_stored, TID_A_old_stored, T_A, CA_i, HA_i, CA_other, HA_other) ]
+    --[ Eq(M1, M1_calc),
+         A2_Terminated_Action(ID_A),
+         Unrecognized_TID(ID_A, TID_A) ]->
+    [ !Auth_Fail_Record(ID_A, TID_A) ]
+
+rule A3_SD_B_Respond_Success:
+    let
+        RB_j = PUF(CB_j)
+        HB_j_calc = h(<CB_j, RB_j>)
+        PB_j = h(<HB_j_calc, ID_B, T2>)
+        recovered2 = Xor(L2, PB_j)
+        M2_calc = h(<recovered2, HB_j_calc, T2, ID_B>)
+        T3 = ~T3
+        r2 = ~r2
+        L3 = Xor(<r2, T2, PB_j>, PA_i)
+        M3 = h(<T2, T3, recovered, r2, PA_i, PB_j>)
+    in
+    [ In(<CB_j, L2, T2, M2>),
+      !Session_A2(ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i),
+      Fr(~T3), Fr(~r2) ]
+    --[ Eq(M2, M2_calc),
+         A3_M2_Verified(ID_B),
+         A3_Responded_Action(ID_B) ]->
+    [ !Session_A3(ID_B, ID_A, recovered, PA_i, PB_j, r2, T2, T3),
+      !Session_A2_Used(ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i),
+      Out(<CA_i, M3, L3, T3>) ]
+
+rule A4_SD_A_Confirm:
+    let
+        RA_i = PUF(CA_i)
+        HA_i_calc = h(<CA_i, RA_i>)
+        PA_i_calc = h(<HA_i_calc, ID_A, T1>)
+        M3_calc = h(<T2, T3, recovered_S2, r2, PA_i_calc, PB_j>)
+        T4 = ~T4
+        SK = hprime(<T4, recovered_S2, r2, PA_i_calc, PB_j>)
+        M4 = h(<T4, recovered_S2, r2, PA_i_calc, PB_j>)
+        TID_A_new = h(<HA_i_calc, ID_A, T1>)
+        C_A_new = CA_i
+        MN_A_new = Xor(RA_i, ID_A)
+    in
+    [ In(<CA_i, M3, L3, T3>),
+      !Session_A1_Used(ID_A, TID_A, r1, T1),
+      !Session_A3(ID_B, ID_A, recovered_S2, PA_i_calc, PB_j, r2, T2, T3),
+      !SD_A_Storage(ID_A, TID_A, C_A_old, MN_A_old, CA_i, HA_i_calc, CA_other, HA_other),
+      Fr(~T4) ]
+    --[ Eq(M3, M3_calc),
+         A4_M3_Verified(ID_A),
+         A4_Confirmed_Action(ID_A, ID_B, SK) ]->
+    [ !SessionKey_A(ID_A, ID_B, SK),
+      !SD_A_Storage(ID_A, TID_A_new, C_A_new, MN_A_new, CA_other, HA_other, $none, $none),
+      !Session_A3_Used(ID_B, ID_A, recovered_S2, PA_i_calc, PB_j, r2, T2, T3),
+      Out(<M4, T4>) ]
+
+rule A5_SD_B_Finish:
+    let
+        M4_calc = h(<T4, recovered, r2, PA_i, PB_j>)
+        SK = hprime(<T4, recovered, r2, PA_i, PB_j>)
+    in
+    [ In(<M4, T4>),
+      !Session_A2_Used(ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i),
+      !Session_A3_Used(ID_B, ID_A, recovered_S2, PA_i, PB_j, r2, T2, T3) ]
+    --[ Eq(M4, M4_calc),
+         A5_M4_Verified(ID_B),
+         A5_Finished_Action(ID_A, ID_B, SK),
+         Pair_Established(ID_A, ID_B, SK) ]->
+    [ !SessionKey_B(ID_B, ID_A, SK) ]
+
+/* ==============================================
+   六、防篡改检测机制
+   ============================================== */
+
+rule Tamper_Detection_Failure:
+    [ !Auth_Fail_Record(ID_A, TID_A) ]
+    --[ Auth_Failure_Action(ID_A) ]->
+    [ !Failure_Count(ID_A, '1') ]
+
+rule Tamper_Detection_Failure_Increment:
+    [ !Failure_Count(ID_A, '1') ]
+    --[ Auth_Failure_Action(ID_A) ]->
+    [ !Failure_Count(ID_A, '2') ]
+
+rule Tamper_Detection_Failure_Final:
+    [ !Failure_Count(ID_A, '2') ]
+    --[ Auth_Failure_Action(ID_A) ]->
+    [ !Failure_Count(ID_A, '3') ]
+
+rule Tamper_Detection_Probe:
+    [ !Failure_Count(ID_A, '3'),
+      !GWN_DB(ID_A, TID_A, TID_A_old, T_A, CA_i, HA_i, CA_new, HA_new) ]
+    --[ Tamper_Detected_Action(ID_A) ]->
+    [ !Revoked(ID_A) ]
+
+/* ==============================================
+   PUF CRP 管理与建模攻击
+   ============================================== */
+
+rule PUF_CRP_Leak:
+    [ !PUF_CRP(c, r) ]
+    --[ CRP_Leaked(c) ]->
+    [ Out(r) ]
+
+rule Adv_PUF_Model:
+    [ !Know(c), !PUF_CRP(c, r) ]
+    --[ PUF_Modeled(c) ]->
+    [ !Know(r) ]
+
+/* ==============================================
+   七、敌手模型
+   ============================================== */
+
+rule Adv_Eavesdrop:
+    [ In(x) ] --[ Adv_Eavesdrop_Action(x) ]-> [ !Know(x) ]
+
+rule Adv_Send:
+    [ !Know(x) ] --[ Adv_Send_Action(x) ]-> [ Out(x) ]
+
+rule Adv_Block:
+    [ In(x) ] --> [ ]
+
+rule Adv_Concat:
+    [ !Know(x), !Know(y) ] --> [ !Know(<x, y>) ]
+
+rule Adv_Split:
+    [ !Know(<x, y>) ] --> [ !Know(x), !Know(y) ]
+
+rule Adv_Hash:
+    [ !Know(x) ] --> [ !Know(h(x)) ]
+
+rule Adv_Hash_Prime:
+    [ !Know(x) ] --> [ !Know(hprime(x)) ]
+
+rule Adv_Xor_Combine:
+    [ !Know(x), !Know(y) ] --> [ !Know(Xor(x, y)) ]
+
+rule Adv_Xor_Split1:
+    [ !Know(Xor(x, y)), !Know(x) ] --> [ !Know(y), !Know(x), !Know(Xor(x, y)) ]
+
+rule Adv_Xor_Split2:
+    [ !Know(Xor(x, y)), !Know(y) ] --> [ !Know(x), !Know(y), !Know(Xor(x, y)) ]
+
+rule Adv_Capture_SD_A:
+    [ !SD_A_Storage(ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2) ]
+    --[ Capture_A(ID_A) ]->
+    [ !Know(ID_A), !Know(TID_A), !Know(C_A), !Know(MN_A), !Know(CA_1), !Know(HA_1), !Know(CA_2), !Know(HA_2) ]
+
+rule Adv_Capture_SD_B:
+    [ !SD_B_Storage(ID_B, CB_1, CB_2, AttrSet_B) ]
+    --[ Capture_B(ID_B) ]->
+    [ !Know(ID_B), !Know(CB_1), !Know(CB_2), !Know(AttrSet_B) ]
+
+rule Adv_Insider_RC:
+    [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
+    --[ Insider_RC(ID_A) ]->
+    [ !Know(ID_A), !Know(TID_A), !Know(CA_1), !Know(HA_1) ]
+
+rule Adv_Insider_GWN:
+    [ !GWN_DB(ID_A, TID_A, TID_A_new, T_A, CA_i, HA_i, CA_other, HA_other) ]
+    --[ Insider_GWN(ID_A) ]->
+    [ !Know(ID_A), !Know(TID_A), !Know(TID_A_new), !Know(CA_i), !Know(HA_i) ]
+
+rule Adv_Leak_SessionKey:
+    [ !SessionKey_A(ID_A, ID_B, SK) ]
+    --[ Leak_SK_Action(SK) ]->
+    [ !Know(SK) ]
+
+rule Adv_Leak_Nonce:
+    [ Fr(~n) ] --[ Leak_Nonce_Action(~n) ]-> [ !Know(~n) ]
+
+rule Adv_Link_Sessions:
+    [ !Know(ID_A1), !Know(ID_A2) ]
+    --[ Link_Sessions(ID_A1, ID_A2) ]->
+    [ ]
+
+/* ==============================================
+   八、Restrictions
+   ============================================== */
+
+restriction eq_holds:
+    "∀ x y #i. Eq(x, y) @ #i ⇒ x = y"
+
+restriction time_window_valid:
+    "∀ t1 ta #i.
+        TimeWindow(t1, ta) @ #i
+        ⇒ ¬ (t1 = ta)"
+
+restriction time_window_reject:
+    "∀ t1 ta #i.
+        NotTimeWindow(t1, ta) @ #i
+        ⇒ (t1 = ta)"
+
+/* ==============================================
+   九、安全属性引理
+   ============================================== */
+lemma Man_in_the_Middle_Attack:
+    all-traces
+    "∀ ID_A ID_B SK #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i ∧ A5_Finished_Action(ID_A, ID_B, SK) @ #j)
+        ⇒ ¬ (∃ #k. !Know(SK) @ #k ∧ ¬ (∃ #l. Leak_SK_Action(SK) @ #l ∧ #l < #k))"
+
+lemma Replay_Attack:
+    all-traces
+    "∀ ID_A ID_B TID_A SK1 SK2 #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK1) @ #i
+         ∧ TID_Used(ID_A, TID_A) @ #i
+         ∧ A4_Confirmed_Action(ID_A, ID_B, SK2) @ #j
+         ∧ TID_Used(ID_A, TID_A) @ #j
+         ∧ ¬ (#i = #j))
+        ⇒
+        (SK1 = SK2)"
+
+lemma Impersonation_Attack:
+    all-traces
+    "∀ ID_A #i.
+        A2_Forwarded_Action(ID_A) @ #i
+        ⇒ (∃ #j. A1_Sent_Action(ID_A) @ #j ∧ #j < #i)"
+
+lemma Privileged_Insider_Attack_RC:
+    all-traces
+    "∀ ID_A ID_B SK #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ Insider_RC(ID_A) @ #j
+        ∧ #j < #i)
+        ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
+
+lemma Privileged_Insider_Attack_GWN:
+    all-traces
+    "∀ ID_A ID_B SK #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ Insider_GWN(ID_A) @ #j
+        ∧ #j < #i)
+        ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
+
+lemma Credential_Leakage_Resistance:
+    all-traces
+    "∀ ID_A ID_B SK #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+         ∧ Insider_GWN(ID_A) @ #j
+         ∧ #j < #i)
+        ⇒
+        ¬ (∃ #k. !Know(SK) @ #k)"
+
+lemma Anonymity:
+    all-traces
+    "∀ ID_A #i #j.
+        (A1_Sent_Action(ID_A) @ #i ∧ Out(ID_A) @ #j ∧ #i < #j)
+        ⇒
+        (∃ #k. Capture_A(ID_A) @ #k ∧ #k < #j)"
+
+lemma Device_Capture_Attack:
+    all-traces
+    "∀ ID_A CA_i #j #l.
+        (Capture_A(ID_A) @ #j
+        ∧ !Know(PUF(CA_i)) @ #l)
+        ⇒ #j < #l"
+
+lemma Forward_Secrecy_A:
+    all-traces
+    "∀ ID_A ID_B SK #i #j #k.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ Capture_A(ID_A) @ #j
+        ∧ #i < #j
+        ∧ !Know(SK) @ #k)
+        ⇒ #k < #j"
+
+lemma Forward_Secrecy_B:
+    all-traces
+    "∀ ID_A ID_B SK #i #j #k.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ Capture_B(ID_B) @ #j
+        ∧ #i < #j
+        ∧ !Know(SK) @ #k)
+        ⇒ #k < #j"
+
+lemma Eavesdropping_Attack:
+    all-traces
+    "∀ ID_A ID_B SK x #i #j.
+        (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ Adv_Eavesdrop_Action(x) @ #j
+        ∧ #j < #i)
+        ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
+        
+lemma Data_Tampering_Resistance:
+    all-traces
+    "∀ ID_A M1 #i #j.
+        Out(M1) @ #i
+        ∧ A2_M1_Verified(ID_A) @ #j
+        ∧ #i < #j
+        ⇒
+        (∃ #k. In(M1) @ #k ∧ #i < #k ∧ #k < #j)"
+     
+lemma Desynchronization_Attack:
+    all-traces
+    "∀ ID_A TID_A_old TID_A_new T_A CA_i HA_i CA_other HA_other #i #j.
+        (!GWN_DB(ID_A, TID_A_new, TID_A_old, T_A, CA_i, HA_i, CA_other, HA_other) @ #i
+        ∧ A2_Forwarded_Action(ID_A) @ #j)
+        ⇒ #i < #j"
+
+lemma Tamper_Detection:
+    all-traces
+    "∀ ID_A #i.
+        Tamper_Detected_Action(ID_A) @ #i
+        ⇒ (∃ #j. Auth_Failure_Action(ID_A) @ #j ∧ #j < #i)"
+
+lemma PUF_Modeling_Resistance:
+    all-traces
+    "∀ c #i.
+        !Know(c) @ #i
+        ⇒ ¬ (∃ #j. !Know(PUF(c)) @ #j)"
+
+lemma Session_Key_Security:
+    all-traces
+    "∀ ID_A ID_B SK #i #k.
+        ( A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
+        ∧ !Know(SK) @ #k )
+        ⇒ (∃ #l. Leak_SK_Action(SK) @ #l ∧ #l < #k)"
+
+end
