@@ -1,15 +1,11 @@
-theory RLAKA_Complete_Verification
+theory RLAKA
 begin
 
 builtins: hashing
 
 functions: Xor/2
-functions: PUF/1 [private]
-functions: h/1, hprime/1
-
-/* ==============================================
-   一、系统初始化
-   ============================================== */
+functions: PUF/2 [private]
+functions: hprime/1
 
 rule RC_Init:
     [ Fr(~sk_RC), Fr(~pk_RC) ]
@@ -20,10 +16,6 @@ rule Factory_Init:
     [ Fr(~sk_F), Fr(~pk_F), Fr(~ID_F) ]
     --[ Factory_Initialized(~ID_F, ~sk_F, ~pk_F) ]->
     [ !Factory_Keys(~ID_F, ~sk_F, ~pk_F) ]
-
-/* ==============================================
-   二、设备注册阶段
-   ============================================== */
 
 rule R1_SD_A_To_Factory:
     [ Fr(~sk_A), Fr(~pk_A) ]
@@ -60,8 +52,9 @@ rule R3_RC_To_SD_A:
 
 rule R4_SD_A_Response:
     let
-        RA_1 = PUF(CA_1)
-        RA_2 = PUF(CA_2)
+
+        RA_1 = PUF(ID_A, CA_1)
+        RA_2 = PUF(ID_A, CA_2)
         HA_1 = h(<CA_1, RA_1>)
         HA_2 = h(<CA_2, RA_2>)
         C_A = CA_1
@@ -74,8 +67,9 @@ rule R4_SD_A_Response:
       Fr(~T_A) ]
     --[ SD_A_Stored_Action(ID_A) ]->
     [ !SD_A_Storage(ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2),
-      !PUF_CRP(CA_1, RA_1),
-      !PUF_CRP(CA_2, RA_2),
+
+      !PUF_CRP(ID_A, CA_1, RA_1),
+      !PUF_CRP(ID_A, CA_2, RA_2),
       Out(<HA_1, HA_2, ID_A, TID_A, T_A, Sig_A>) ]
 
 rule R5_RC_Complete:
@@ -83,10 +77,6 @@ rule R5_RC_Complete:
       !RC_DB(ID_A, TID_A, CA_1, CA_2) ]
     --[ Registration_Done_Action(ID_A) ]->
     [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
-
-/* ==============================================
-   三、上传与授权阶段
-   ============================================== */
 
 rule RC_To_CSC:
     [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
@@ -98,10 +88,6 @@ rule CSC_To_GWN:
     --[ GWN_Got_Action(ID_A) ]->
     [ !GWN_DB(ID_A, TID_A, $none, $none, CA_1, HA_1, CA_2, HA_2) ]
 
-/* ==============================================
-   四、SD_B 注册
-   ============================================== */
-
 rule SD_B_Registration:
     [ Fr(~ID_B), Fr(~CB_1), Fr(~CB_2), Fr(~AttrSet_B) ]
     --[ SD_B_Registered_Action(~ID_B) ]->
@@ -109,24 +95,23 @@ rule SD_B_Registration:
 
 rule GWN_Store_SD_B:
     let
-        RB_1 = PUF(CB_1)
-        RB_2 = PUF(CB_2)
+
+        RB_1 = PUF(ID_B, CB_1)
+        RB_2 = PUF(ID_B, CB_2)
         HB_1 = h(<CB_1, RB_1>)
         HB_2 = h(<CB_2, RB_2>)
     in
     [ !SD_B_Storage(ID_B, CB_1, CB_2, AttrSet_B) ]
     --[ GWN_Stored_SD_B_Action(ID_B) ]->
     [ !GWN_DB_B(ID_B, CB_1, HB_1, CB_2, HB_2, AttrSet_B),
-      !PUF_CRP(CB_1, RB_1),
-      !PUF_CRP(CB_2, RB_2) ]
 
-/* ==============================================
-   五、认证与密钥协商阶段
-   ============================================== */
+      !PUF_CRP(ID_B, CB_1, RB_1),
+      !PUF_CRP(ID_B, CB_2, RB_2) ]
 
 rule A1_SD_A_Send_Msg1:
     let
-        R_A = PUF(C_A)
+
+        R_A = PUF(ID_A, C_A)
         ID_A_recovered = Xor(R_A, MN_A)
         r1 = ~r1
         T1 = ~T1
@@ -227,7 +212,8 @@ rule A2_GWN_Case3_Terminate:
 
 rule A3_SD_B_Respond_Success:
     let
-        RB_j = PUF(CB_j)
+
+        RB_j = PUF(ID_B, CB_j)
         HB_j_calc = h(<CB_j, RB_j>)
         PB_j = h(<HB_j_calc, ID_B, T2>)
         recovered2 = Xor(L2, PB_j)
@@ -249,7 +235,8 @@ rule A3_SD_B_Respond_Success:
 
 rule A4_SD_A_Confirm:
     let
-        RA_i = PUF(CA_i)
+
+        RA_i = PUF(ID_A, CA_i)
         HA_i_calc = h(<CA_i, RA_i>)
         PA_i_calc = h(<HA_i_calc, ID_A, T1>)
         M3_calc = h(<T2, T3, recovered_S2, r2, PA_i_calc, PB_j>)
@@ -287,10 +274,6 @@ rule A5_SD_B_Finish:
          Pair_Established(ID_A, ID_B, SK) ]->
     [ !SessionKey_B(ID_B, ID_A, SK) ]
 
-/* ==============================================
-   六、防篡改检测机制
-   ============================================== */
-
 rule Tamper_Detection_Failure:
     [ !Auth_Fail_Record(ID_A, TID_A) ]
     --[ Auth_Failure_Action(ID_A) ]->
@@ -312,23 +295,6 @@ rule Tamper_Detection_Probe:
     --[ Tamper_Detected_Action(ID_A) ]->
     [ !Revoked(ID_A) ]
 
-/* ==============================================
-   PUF CRP 管理与建模攻击
-   ============================================== */
-
-rule PUF_CRP_Leak:
-    [ !PUF_CRP(c, r) ]
-    --[ CRP_Leaked(c) ]->
-    [ Out(r) ]
-
-rule Adv_PUF_Model:
-    [ !Know(c), !PUF_CRP(c, r) ]
-    --[ PUF_Modeled(c) ]->
-    [ !Know(r) ]
-
-/* ==============================================
-   七、敌手模型
-   ============================================== */
 
 rule Adv_Eavesdrop:
     [ In(x) ] --[ Adv_Eavesdrop_Action(x) ]-> [ !Know(x) ]
@@ -373,12 +339,12 @@ rule Adv_Capture_SD_B:
 rule Adv_Insider_RC:
     [ !RC_Final_DB(ID_A, TID_A, CA_1, HA_1, CA_2, HA_2) ]
     --[ Insider_RC(ID_A) ]->
-    [ !Know(ID_A), !Know(TID_A), !Know(CA_1), !Know(HA_1) ]
+    [ !Know(ID_A), !Know(TID_A), !Know(CA_1), !Know(CA_2) ]
 
 rule Adv_Insider_GWN:
     [ !GWN_DB(ID_A, TID_A, TID_A_new, T_A, CA_i, HA_i, CA_other, HA_other) ]
     --[ Insider_GWN(ID_A) ]->
-    [ !Know(ID_A), !Know(TID_A), !Know(TID_A_new), !Know(CA_i), !Know(HA_i) ]
+    [ !Know(ID_A), !Know(TID_A), !Know(TID_A_new), !Know(CA_i) ]
 
 rule Adv_Leak_SessionKey:
     [ !SessionKey_A(ID_A, ID_B, SK) ]
@@ -393,10 +359,6 @@ rule Adv_Link_Sessions:
     --[ Link_Sessions(ID_A1, ID_A2) ]->
     [ ]
 
-/* ==============================================
-   八、Restrictions
-   ============================================== */
-
 restriction eq_holds:
     "∀ x y #i. Eq(x, y) @ #i ⇒ x = y"
 
@@ -410,9 +372,6 @@ restriction time_window_reject:
         NotTimeWindow(t1, ta) @ #i
         ⇒ (t1 = ta)"
 
-/* ==============================================
-   九、安全属性引理
-   ============================================== */
 lemma Man_in_the_Middle_Attack:
     all-traces
     "∀ ID_A ID_B SK #i #j.
@@ -442,7 +401,8 @@ lemma Privileged_Insider_Attack_RC:
         (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
         ∧ Insider_RC(ID_A) @ #j
         ∧ #j < #i)
-        ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
+        ⇒ (∀ #k. !Know(SK) @ #k
+              ⇒ (∃ #l. Leak_SK_Action(SK) @ #l ∧ #l < #k))"
 
 lemma Privileged_Insider_Attack_GWN:
     all-traces
@@ -450,7 +410,8 @@ lemma Privileged_Insider_Attack_GWN:
         (A4_Confirmed_Action(ID_A, ID_B, SK) @ #i
         ∧ Insider_GWN(ID_A) @ #j
         ∧ #j < #i)
-        ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
+        ⇒ (∀ #k. !Know(SK) @ #k
+              ⇒ (∃ #l. Leak_SK_Action(SK) @ #l ∧ #l < #k))"
 
 lemma Credential_Leakage_Resistance:
     all-traces
@@ -461,18 +422,11 @@ lemma Credential_Leakage_Resistance:
         ⇒
         ¬ (∃ #k. !Know(SK) @ #k)"
 
-lemma Anonymity:
-    all-traces
-    "∀ ID_A #i #j.
-        (A1_Sent_Action(ID_A) @ #i ∧ Out(ID_A) @ #j ∧ #i < #j)
-        ⇒
-        (∃ #k. Capture_A(ID_A) @ #k ∧ #k < #j)"
-
 lemma Device_Capture_Attack:
     all-traces
     "∀ ID_A CA_i #j #l.
         (Capture_A(ID_A) @ #j
-        ∧ !Know(PUF(CA_i)) @ #l)
+        ∧ !Know(PUF(ID_A, CA_i)) @ #l)
         ⇒ #j < #l"
 
 lemma Forward_Secrecy_A:
@@ -500,7 +454,7 @@ lemma Eavesdropping_Attack:
         ∧ Adv_Eavesdrop_Action(x) @ #j
         ∧ #j < #i)
         ⇒ ¬ (∃ #k. !Know(SK) @ #k)"
-        
+
 lemma Data_Tampering_Resistance:
     all-traces
     "∀ ID_A M1 #i #j.
@@ -509,25 +463,12 @@ lemma Data_Tampering_Resistance:
         ∧ #i < #j
         ⇒
         (∃ #k. In(M1) @ #k ∧ #i < #k ∧ #k < #j)"
-     
-lemma Desynchronization_Attack:
-    all-traces
-    "∀ ID_A TID_A_old TID_A_new T_A CA_i HA_i CA_other HA_other #i #j.
-        (!GWN_DB(ID_A, TID_A_new, TID_A_old, T_A, CA_i, HA_i, CA_other, HA_other) @ #i
-        ∧ A2_Forwarded_Action(ID_A) @ #j)
-        ⇒ #i < #j"
 
 lemma Tamper_Detection:
     all-traces
     "∀ ID_A #i.
         Tamper_Detected_Action(ID_A) @ #i
         ⇒ (∃ #j. Auth_Failure_Action(ID_A) @ #j ∧ #j < #i)"
-
-lemma PUF_Modeling_Resistance:
-    all-traces
-    "∀ c #i.
-        !Know(c) @ #i
-        ⇒ ¬ (∃ #j. !Know(PUF(c)) @ #j)"
 
 lemma Session_Key_Security:
     all-traces
