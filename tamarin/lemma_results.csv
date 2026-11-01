@@ -1,0 +1,14 @@
+lemma,trace_quantifier,result,proof_steps
+Man_in_the_Middle_Attack,all-traces,verified,87
+Replay_Attack,all-traces,verified,1
+Impersonation_Attack,all-traces,verified,28
+Privileged_Insider_Attack_RC,all-traces,verified,27
+Privileged_Insider_Attack_GWN,all-traces,verified,47
+Credential_Leakage_Resistance,all-traces,verified,47
+Device_Capture_Attack,all-traces,verified,26
+Forward_Secrecy_A,all-traces,verified,254
+Forward_Secrecy_B,all-traces,verified,54
+Eavesdropping_Attack,all-traces,verified,17
+Data_Tampering_Resistance,all-traces,verified,2
+Tamper_Detection,all-traces,verified,29
+Session_Key_Security,all-traces,verified,17

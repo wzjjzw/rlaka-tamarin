@@ -1,0 +1,23 @@
+{
+  "source_repository": "https://github.com/wzjjzw/rlaka-tamarin",
+  "source_commit": "a6e81af9b65870d4e585aec0fb466513e805cde4",
+  "model_sha256": "622aad2b9467c15ce306da1a871b9b59d28904fc1035a6067e4496f48171e8ca",
+  "model_modified": false,
+  "command": [
+    "tamarin-prover",
+    "rlaka.spthy",
+    "--prove",
+    "--bound=9",
+    "--derivcheck-timeout=0"
+  ],
+  "GHCRTS": "-N2",
+  "started_utc": "2026-11-01T03:15:55.535980+00:00",
+  "elapsed_seconds": 36.36490347699964,
+  "exit_code": 0,
+  "timed_out": false,
+  "timeout_seconds": 180,
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.39",
+  "origin": "Actual new execution of the unmodified public repository model; not an original historical author log.",
+  "tamarin_version": "tamarin-prover 1.12.0, (C) David Basin, Cas Cremers, Jannik Dreier, Simon Meier, Ralf Sasse, Benedikt Schmidt, 2010-2023\n\nThis program comes with ABSOLUTELY NO WARRANTY. It is free software, and you\nare welcome to redistribute it according to its LICENSE, see\n'https://github.com/tamarin-prover/tamarin-prover/blob/master/LICENSE'.\n\nGenerated from:\nTamarin version 1.12.0\nMaude version 3.5.1\nGit revision: 82780bbaf3328a45f624ddb41e51bf75425f851c (with uncommited changes), branch: master\nCompiled at: 2026-03-07 14:22:39.174278293 UTC\nmaude tool: 'maude'\n checking version: 3.5.1. OK.\n checking installation: OK.\n",
+  "maude_version": "3.5.1\n"
+}

@@ -1,0 +1,3995 @@
+maude tool: 'maude'
+ checking version: 3.5.1. OK.
+ checking installation: OK.
+[Theory RLAKA] Theory loaded
+[Theory RLAKA] Theory translated
+[Theory RLAKA] Theory closed
+[Saturating Sources] Step 1 (Max 5)
+[Saturating Sources] Done
+theory RLAKA
+
+begin
+
+// Function signature and definition of the equational theory E
+
+functions: PUF/2[private,constructor], Xor/2, fst/1, h/1, hprime/1,
+           pair/2, snd/1
+equations: fst(<x.1, x.2>) = x.1, snd(<x.1, x.2>) = x.2
+
+rule (modulo E) RC_Init:
+   [ Fr( ~sk_RC ), Fr( ~pk_RC ) ]
+  --[ RC_Initialized( ~sk_RC, ~pk_RC ) ]->
+   [ !RC_Keys( ~sk_RC, ~pk_RC ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Factory_Init:
+   [ Fr( ~sk_F ), Fr( ~pk_F ), Fr( ~ID_F ) ]
+  --[ Factory_Initialized( ~ID_F, ~sk_F, ~pk_F ) ]->
+   [ !Factory_Keys( ~ID_F, ~sk_F, ~pk_F ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) R1_SD_A_To_Factory:
+   [ Fr( ~sk_A ), Fr( ~pk_A ) ]
+  --[ SD_A_Registered_Action( ~sk_A ) ]->
+   [ !SD_A_Keys( ~sk_A, ~pk_A ), Out( ~pk_A ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) R2_Factory_To_RC:
+   [ In( pk_A ), !Factory_Keys( ID_F, sk_F, pk_F ), Fr( ~T_FA ) ]
+  --[ Factory_Signed_Action( ID_F ) ]->
+   [ Out( <pk_A, ID_F, ~T_FA, h(<sk_F, pk_A, ID_F, ~T_FA>)> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) R3_RC_To_SD_A:
+   [
+   In( <pk_A, ID_F, T_FA, Sig_F> ), !RC_Keys( sk_RC, pk_RC ), Fr( ~T_RA ),
+   Fr( ~ID_A ), Fr( ~TID_A ), Fr( ~CA_1 ), Fr( ~CA_2 )
+   ]
+  --[ RC_Issued_Action( ~ID_A, ~TID_A ) ]->
+   [
+   !RC_DB( ~ID_A, ~TID_A, ~CA_1, ~CA_2 ),
+   Out( <~ID_A, ~TID_A, ~CA_1, ~CA_2, ~T_RA, 
+         h(<sk_RC, ~ID_A, ~TID_A, ~CA_1, ~CA_2, ~T_RA>)>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) R4_SD_A_Response:
+   [
+   In( <ID_A, TID_A, CA_1, CA_2, T_RA, Sig_RC> ), !SD_A_Keys( sk_A, pk_A ),
+   Fr( ~T_A )
+   ]
+  --[ SD_A_Stored_Action( ID_A ) ]->
+   [
+   !SD_A_Storage( ID_A, TID_A, CA_1, Xor(PUF(ID_A, CA_1), ID_A), CA_1,
+                  h(<CA_1, PUF(ID_A, CA_1)>), CA_2, h(<CA_2, PUF(ID_A, CA_2)>)
+   ),
+   !PUF_CRP( ID_A, CA_1, PUF(ID_A, CA_1) ),
+   !PUF_CRP( ID_A, CA_2, PUF(ID_A, CA_2) ),
+   Out( <h(<CA_1, PUF(ID_A, CA_1)>), h(<CA_2, PUF(ID_A, CA_2)>), ID_A, 
+         TID_A, ~T_A, 
+         h(<sk_A, h(<CA_1, PUF(ID_A, CA_1)>), h(<CA_2, PUF(ID_A, CA_2)>), ID_A, 
+            TID_A, ~T_A>)
+        >
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) R5_RC_Complete:
+   [
+   In( <HA_1, HA_2, ID_A, TID_A, T_A, Sig_A> ),
+   !RC_DB( ID_A, TID_A, CA_1, CA_2 )
+   ]
+  --[ Registration_Done_Action( ID_A ) ]->
+   [ !RC_Final_DB( ID_A, TID_A, CA_1, HA_1, CA_2, HA_2 ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) RC_To_CSC:
+   [ !RC_Final_DB( ID_A, TID_A, CA_1, HA_1, CA_2, HA_2 ) ]
+  --[ CSC_Got_Action( ID_A ) ]->
+   [ !CSC_DB( ID_A, TID_A, CA_1, HA_1, CA_2, HA_2 ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CSC_To_GWN:
+   [ !CSC_DB( ID_A, TID_A, CA_1, HA_1, CA_2, HA_2 ) ]
+  --[ GWN_Got_Action( ID_A ) ]->
+   [ !GWN_DB( ID_A, TID_A, $none, $none, CA_1, HA_1, CA_2, HA_2 ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SD_B_Registration:
+   [ Fr( ~ID_B ), Fr( ~CB_1 ), Fr( ~CB_2 ), Fr( ~AttrSet_B ) ]
+  --[ SD_B_Registered_Action( ~ID_B ) ]->
+   [ !SD_B_Storage( ~ID_B, ~CB_1, ~CB_2, ~AttrSet_B ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) GWN_Store_SD_B:
+   [ !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ]
+  --[ GWN_Stored_SD_B_Action( ID_B ) ]->
+   [
+   !GWN_DB_B( ID_B, CB_1, h(<CB_1, PUF(ID_B, CB_1)>), CB_2,
+              h(<CB_2, PUF(ID_B, CB_2)>), AttrSet_B
+   ),
+   !PUF_CRP( ID_B, CB_1, PUF(ID_B, CB_1) ),
+   !PUF_CRP( ID_B, CB_2, PUF(ID_B, CB_2) )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A1_SD_A_Send_Msg1:
+   [
+   !SD_A_Storage( ID_A, TID_A, C_A, MN_A, CA_i, HA_i, CA_other, HA_other ),
+   !GWN_DB( Xor(PUF(ID_A, C_A), MN_A), TID_A, TID_A_old, T_A, CA_i_db,
+            HA_i_db, CA_other_db, HA_other_db
+   ),
+   Fr( ~r1 ), Fr( ~T1 )
+   ]
+  --[
+  A1_Sent_Action( Xor(PUF(ID_A, C_A), MN_A) ),
+  TID_Used( Xor(PUF(ID_A, C_A), MN_A), TID_A )
+  ]->
+   [
+   !Session_A1( Xor(PUF(ID_A, C_A), MN_A), TID_A, ~r1, ~T1 ),
+   Out( <h(<~r1, 'sensor_attr', Xor(PUF(ID_A, C_A), MN_A), TID_A, ~T1>), 
+         Xor(<~r1, 'sensor_attr'>, h(<Xor(PUF(ID_A, C_A), MN_A), TID_A, ~T1>)), 
+         ~T1, TID_A>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A2_GWN_Case1_Normal:
+   [
+   In( <M1, L1, T1, TID_A> ), !Session_A1( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, TID_A, TID_A_old, T_A, CA_i, HA_i, CA_other, HA_other ),
+   !GWN_DB_B( ID_B, CB_j, HB_j, CB_other, HB_other, AttrSet_B ), Fr( ~T2 )
+   ]
+  --[
+  Eq( M1, h(<Xor(L1, h(<ID_A, TID_A, T1>)), ID_A, TID_A, T1>) ),
+  A2_M1_Verified( ID_A ), A2_Forwarded_Action( ID_A ),
+  Case1_Normal( ID_A ), TID_Linked( ID_A, TID_A, h(<HA_i, ID_A, T1>) )
+  ]->
+   [
+   !Session_A2( ID_A, TID_A, ID_B, Xor(L1, h(<ID_A, TID_A, T1>)),
+                h(<HA_i, ID_A, T1>), ~T2, CA_i
+   ),
+   !Session_A1_Used( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, h(<HA_i, ID_A, T1>), TID_A, ~T2, CA_other, HA_other,
+            $none, $none
+   ),
+   !GWN_DB_B( ID_B, CB_other, HB_other, $none, $none, AttrSet_B ),
+   Out( <CB_j, 
+         Xor(<Xor(L1, h(<ID_A, TID_A, T1>)), TID_A, CA_i, h(<HA_i, ID_A, T1>)>,
+             h(<HB_j, ~T2, ID_B>)), 
+         ~T2, 
+         h(<Xor(L1, h(<ID_A, TID_A, T1>)), TID_A, CA_i, h(<HA_i, ID_A, T1>), 
+            HB_j, ~T2, ID_B>)
+        >
+   )
+   ]
+
+  // loop breakers: [1,2,3]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A2_GWN_Case2_OldAccept:
+   [
+   In( <M1, L1, T1, TID_A> ), !Session_A1( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, TID_A_new_stored, TID_A, T_A, CA_i, HA_i, CA_other,
+            HA_other
+   ),
+   !GWN_DB_B( ID_B, CB_j, HB_j, CB_other, HB_other, AttrSet_B ), Fr( ~T2 )
+   ]
+  --[
+  Eq( M1, h(<Xor(L1, h(<ID_A, TID_A, T1>)), ID_A, TID_A, T1>) ),
+  TimeWindow( T1, T_A ), A2_M1_Verified( ID_A ),
+  A2_Forwarded_Action( ID_A ), Case2_OldUsed( ID_A )
+  ]->
+   [
+   !Session_A2( ID_A, TID_A, ID_B, Xor(L1, h(<ID_A, TID_A, T1>)),
+                h(<HA_i, ID_A, T1>), ~T2, CA_i
+   ),
+   !Session_A1_Used( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, TID_A_new_stored, TID_A, T_A, CA_other, HA_other, $none,
+            $none
+   ),
+   !GWN_DB_B( ID_B, CB_other, HB_other, $none, $none, AttrSet_B ),
+   Out( <CB_j, 
+         Xor(<Xor(L1, h(<ID_A, TID_A, T1>)), TID_A, CA_i, h(<HA_i, ID_A, T1>)>,
+             h(<HB_j, ~T2, ID_B>)), 
+         ~T2, 
+         h(<Xor(L1, h(<ID_A, TID_A, T1>)), TID_A, CA_i, h(<HA_i, ID_A, T1>), 
+            HB_j, ~T2, ID_B>)
+        >
+   )
+   ]
+
+  // loop breakers: [1,2,3]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A2_GWN_Case2_OldReject:
+   [
+   In( <M1, L1, T1, TID_A> ), !Session_A1( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, TID_A_new_stored, TID_A, T_A, CA_i, HA_i, CA_other,
+            HA_other
+   )
+   ]
+  --[
+  Eq( M1, h(<Xor(L1, h(<ID_A, TID_A, T1>)), ID_A, TID_A, T1>) ),
+  NotTimeWindow( T1, T_A ), A2_Terminated_Action( ID_A ),
+  Case2_OldRejected( ID_A )
+  ]->
+   [
+   !Auth_Fail_Record( ID_A, TID_A ),
+   !Session_A1_Used( ID_A, TID_A, r1_old, T1_old )
+   ]
+
+  // loop breaker: [1]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A2_GWN_Case3_Terminate:
+   [
+   In( <M1, L1, T1, TID_A> ), !Session_A1( ID_A, TID_A, r1_old, T1_old ),
+   !GWN_DB( ID_A, TID_A_new_stored, TID_A_old_stored, T_A, CA_i, HA_i,
+            CA_other, HA_other
+   )
+   ]
+  --[
+  Eq( M1, h(<Xor(L1, h(<ID_A, TID_A, T1>)), ID_A, TID_A, T1>) ),
+  A2_Terminated_Action( ID_A ), Unrecognized_TID( ID_A, TID_A )
+  ]->
+   [ !Auth_Fail_Record( ID_A, TID_A ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A3_SD_B_Respond_Success:
+   [
+   In( <CB_j, L2, T2, M2> ),
+   !Session_A2( ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i ), Fr( ~T3 ),
+   Fr( ~r2 )
+   ]
+  --[
+  Eq( M2,
+      h(<Xor(L2, h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, T2>)), 
+         h(<CB_j, PUF(ID_B, CB_j)>), T2, ID_B>)
+  ),
+  A3_M2_Verified( ID_B ), A3_Responded_Action( ID_B )
+  ]->
+   [
+   !Session_A3( ID_B, ID_A, recovered, PA_i,
+                h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, T2>), ~r2, T2, ~T3
+   ),
+   !Session_A2_Used( ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i ),
+   Out( <CA_i, 
+         h(<T2, ~T3, recovered, ~r2, PA_i, 
+            h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, T2>)>), 
+         Xor(<~r2, T2, h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, T2>)>, PA_i), ~T3>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A4_SD_A_Confirm:
+   [
+   In( <CA_i, M3, L3, T3> ), !Session_A1_Used( ID_A, TID_A, r1, T1 ),
+   !Session_A3( ID_B, ID_A, recovered_S2,
+                h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+   ),
+   !SD_A_Storage( ID_A, TID_A, C_A_old, MN_A_old, CA_i,
+                  h(<CA_i, PUF(ID_A, CA_i)>), CA_other, HA_other
+   ),
+   Fr( ~T4 )
+   ]
+  --[
+  Eq( M3,
+      h(<T2, T3, recovered_S2, r2, h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+         PB_j>)
+  ),
+  A4_M3_Verified( ID_A ),
+  A4_Confirmed_Action( ID_A, ID_B,
+                       hprime(<~T4, recovered_S2, r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j>)
+  )
+  ]->
+   [
+   !SessionKey_A( ID_A, ID_B,
+                  hprime(<~T4, recovered_S2, r2, 
+                          h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j>)
+   ),
+   !SD_A_Storage( ID_A, h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), CA_i,
+                  Xor(PUF(ID_A, CA_i), ID_A), CA_other, HA_other, $none, $none
+   ),
+   !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                     h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+   ),
+   Out( <
+         h(<~T4, recovered_S2, r2, h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j
+           >), 
+         ~T4>
+   )
+   ]
+
+  // loop breaker: [3]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) A5_SD_B_Finish:
+   [
+   In( <M4, T4> ),
+   !Session_A2_Used( ID_A, TID_A, ID_B, recovered, PA_i, T2, CA_i ),
+   !Session_A3_Used( ID_B, ID_A, recovered_S2, PA_i, PB_j, r2, T2, T3 )
+   ]
+  --[
+  Eq( M4, h(<T4, recovered, r2, PA_i, PB_j>) ), A5_M4_Verified( ID_B ),
+  A5_Finished_Action( ID_A, ID_B, hprime(<T4, recovered, r2, PA_i, PB_j>)
+  ),
+  Pair_Established( ID_A, ID_B, hprime(<T4, recovered, r2, PA_i, PB_j>) )
+  ]->
+   [ !SessionKey_B( ID_B, ID_A, hprime(<T4, recovered, r2, PA_i, PB_j>) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Tamper_Detection_Failure:
+   [ !Auth_Fail_Record( ID_A, TID_A ) ]
+  --[ Auth_Failure_Action( ID_A ) ]->
+   [ !Failure_Count( ID_A, '1' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Tamper_Detection_Failure_Increment:
+   [ !Failure_Count( ID_A, '1' ) ]
+  --[ Auth_Failure_Action( ID_A ) ]->
+   [ !Failure_Count( ID_A, '2' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Tamper_Detection_Failure_Final:
+   [ !Failure_Count( ID_A, '2' ) ]
+  --[ Auth_Failure_Action( ID_A ) ]->
+   [ !Failure_Count( ID_A, '3' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Tamper_Detection_Probe:
+   [
+   !Failure_Count( ID_A, '3' ),
+   !GWN_DB( ID_A, TID_A, TID_A_old, T_A, CA_i, HA_i, CA_new, HA_new )
+   ]
+  --[ Tamper_Detected_Action( ID_A ) ]->
+   [ !Revoked( ID_A ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Eavesdrop:
+   [ In( x ) ] --[ Adv_Eavesdrop_Action( x ) ]-> [ !Know( x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Send:
+   [ !Know( x ) ] --[ Adv_Send_Action( x ) ]-> [ Out( x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Block:
+   [ In( x ) ] --> [ ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Concat:
+   [ !Know( x ), !Know( y ) ] --> [ !Know( <x, y> ) ]
+
+  // loop breakers: [0,1]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Split:
+   [ !Know( <x, y> ) ] --> [ !Know( x ), !Know( y ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Hash:
+   [ !Know( x ) ] --> [ !Know( h(x) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Hash_Prime:
+   [ !Know( x ) ] --> [ !Know( hprime(x) ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Xor_Combine:
+   [ !Know( x ), !Know( y ) ] --> [ !Know( Xor(x, y) ) ]
+
+  // loop breakers: [0,1]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Xor_Split1:
+   [ !Know( Xor(x, y) ), !Know( x ) ]
+  -->
+   [ !Know( y ), !Know( x ), !Know( Xor(x, y) ) ]
+
+  // loop breakers: [0,1]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Xor_Split2:
+   [ !Know( Xor(x, y) ), !Know( y ) ]
+  -->
+   [ !Know( x ), !Know( y ), !Know( Xor(x, y) ) ]
+
+  // loop breakers: [0,1]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Capture_SD_A:
+   [ !SD_A_Storage( ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2 ) ]
+  --[ Capture_A( ID_A ) ]->
+   [
+   !Know( ID_A ), !Know( TID_A ), !Know( C_A ), !Know( MN_A ),
+   !Know( CA_1 ), !Know( HA_1 ), !Know( CA_2 ), !Know( HA_2 )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Capture_SD_B:
+   [ !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ]
+  --[ Capture_B( ID_B ) ]->
+   [ !Know( ID_B ), !Know( CB_1 ), !Know( CB_2 ), !Know( AttrSet_B ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Insider_RC:
+   [ !RC_Final_DB( ID_A, TID_A, CA_1, HA_1, CA_2, HA_2 ) ]
+  --[ Insider_RC( ID_A ) ]->
+   [ !Know( ID_A ), !Know( TID_A ), !Know( CA_1 ), !Know( CA_2 ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Insider_GWN:
+   [ !GWN_DB( ID_A, TID_A, TID_A_new, T_A, CA_i, HA_i, CA_other, HA_other )
+   ]
+  --[ Insider_GWN( ID_A ) ]->
+   [ !Know( ID_A ), !Know( TID_A ), !Know( TID_A_new ), !Know( CA_i ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Leak_SessionKey:
+   [ !SessionKey_A( ID_A, ID_B, SK ) ]
+  --[ Leak_SK_Action( SK ) ]->
+   [ !Know( SK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Leak_Nonce:
+   [ Fr( ~n ) ] --[ Leak_Nonce_Action( ~n ) ]-> [ !Know( ~n ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Adv_Link_Sessions:
+   [ !Know( ID_A1 ), !Know( ID_A2 ) ]
+  --[ Link_Sessions( ID_A1, ID_A2 ) ]->
+   [ ]
+
+  /* has exactly the trivial AC variant */
+
+restriction eq_holds:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  */
+
+restriction time_window_valid:
+  "∀ t1 ta #i. (TimeWindow( t1, ta ) @ #i) ⇒ (¬(t1 = ta))"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ t1 ta #i. (TimeWindow( t1, ta ) @ #i) ⇒ (¬(t1 = ta))"
+  */
+
+restriction time_window_reject:
+  "∀ t1 ta #i. (NotTimeWindow( t1, ta ) @ #i) ⇒ (t1 = ta)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ t1 ta #i. (NotTimeWindow( t1, ta ) @ #i) ⇒ (t1 = ta)"
+  */
+
+lemma Man_in_the_Middle_Attack:
+  all-traces
+  "∀ ID_A ID_B SK #i #j.
+    ((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+     (A5_Finished_Action( ID_A, ID_B, SK ) @ #j)) ⇒
+    (¬(∃ #k.
+        (!Know( SK ) @ #k) ∧
+        (¬(∃ #l. (Leak_SK_Action( SK ) @ #l) ∧ (#l < #k)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+  (A5_Finished_Action( ID_A, ID_B, SK ) @ #j)
+ ∧
+  ∃ #k.
+   (!Know( SK ) @ #k) ∧ ∀ #l. (Leak_SK_Action( SK ) @ #l) ⇒ ¬(#l < #k)"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !Session_A2_Used( ~ID_A, TID_A.1, ID_B,
+                             Xor(L1, h(<~ID_A, TID_A, T1>)),
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !Session_A3_Used( ID_B, ~ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      by solve( !Session_A3_Used( ID_B, ~ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !Session_A2_Used( ~ID_A, TID_A.1, ID_B,
+                             Xor(L1, h(<~ID_A, TID_A, T1>)),
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      by solve( !Session_A3_Used( ID_B, ~ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !Session_A3_Used( ID_B, ~ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !Session_A2_Used( ID_A, TID_A.2, ID_B,
+                             Xor(L1, h(<ID_A, TID_A, T1>)), h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                             T2.1, CA_i.1
+           ) ▶₁ #j )
+      case A3_SD_B_Respond_Success_case_1
+      by solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                                  h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                                  h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+                ) ▶₂ #j )
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !Session_A3_Used( ID_B, ID_A, recovered_S2,
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>),
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>), ~r2, ~T2.1, T3.1
+             ) ▶₂ #j )
+        case A4_SD_A_Confirm_case_1
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_2
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_3
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_4
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_5
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+qed
+
+lemma Replay_Attack:
+  all-traces
+  "∀ ID_A ID_B TID_A SK1 SK2 #i #j.
+    (((((A4_Confirmed_Action( ID_A, ID_B, SK1 ) @ #i) ∧
+        (TID_Used( ID_A, TID_A ) @ #i)) ∧
+       (A4_Confirmed_Action( ID_A, ID_B, SK2 ) @ #j)) ∧
+      (TID_Used( ID_A, TID_A ) @ #j)) ∧
+     (¬(#i = #j))) ⇒
+    (SK1 = SK2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B TID_A SK1 SK2 #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK1 ) @ #i) ∧
+  (TID_Used( ID_A, TID_A ) @ #i) ∧
+  (A4_Confirmed_Action( ID_A, ID_B, SK2 ) @ #j) ∧
+  (TID_Used( ID_A, TID_A ) @ #j)
+ ∧
+  (¬(#i = #j)) ∧ (¬(SK1 = SK2))"
+*/
+by simplify
+
+lemma Impersonation_Attack:
+  all-traces
+  "∀ ID_A #i.
+    (A2_Forwarded_Action( ID_A ) @ #i) ⇒
+    (∃ #j. (A1_Sent_Action( ID_A ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A #i.
+  (A2_Forwarded_Action( ID_A ) @ #i)
+ ∧
+  ∀ #j. (A1_Sent_Action( ID_A ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( A2_Forwarded_Action( ID_A ) @ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A1( ID_A, TID_A, r1_old, T1_old ) ▶₁ #i )
+    case A1_SD_A_Send_Msg1_case_01
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_02
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_03
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_04
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_05
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_06
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_07
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_08
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_09
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_10
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_11
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_12
+    by contradiction /* from formulas */
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A1( ID_A, TID_A, r1_old, T1_old ) ▶₁ #i )
+    case A1_SD_A_Send_Msg1_case_01
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_02
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_03
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_04
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_05
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_06
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_07
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_08
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_09
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_10
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_11
+    by contradiction /* from formulas */
+  next
+    case A1_SD_A_Send_Msg1_case_12
+    by contradiction /* from formulas */
+  qed
+qed
+
+lemma Privileged_Insider_Attack_RC:
+  all-traces
+  "∀ ID_A ID_B SK #i #j.
+    (((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+      (Insider_RC( ID_A ) @ #j)) ∧
+     (#j < #i)) ⇒
+    (∀ #k.
+      (!Know( SK ) @ #k) ⇒ (∃ #l. (Leak_SK_Action( SK ) @ #l) ∧ (#l < #k)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧ (Insider_RC( ID_A ) @ #j)
+ ∧
+  (#j < #i) ∧
+  (∃ #k.
+    (!Know( SK ) @ #k) ∧ ∀ #l. (Leak_SK_Action( SK ) @ #l) ⇒ ¬(#l < #k))"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !RC_Final_DB( ~ID_A, TID_A.1, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !RC_Final_DB( ~ID_A, TID_A.1, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !RC_Final_DB( ID_A, TID_A.2, CA_1, HA_1, CA_2, HA_2 ) ▶₀ #j )
+      case R5_RC_Complete
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+qed
+
+lemma Privileged_Insider_Attack_GWN:
+  all-traces
+  "∀ ID_A ID_B SK #i #j.
+    (((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+      (Insider_GWN( ID_A ) @ #j)) ∧
+     (#j < #i)) ⇒
+    (∀ #k.
+      (!Know( SK ) @ #k) ⇒ (∃ #l. (Leak_SK_Action( SK ) @ #l) ∧ (#l < #k)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧ (Insider_GWN( ID_A ) @ #j)
+ ∧
+  (#j < #i) ∧
+  (∃ #k.
+    (!Know( SK ) @ #k) ∧ ∀ #l. (Leak_SK_Action( SK ) @ #l) ⇒ ¬(#l < #k))"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ~ID_A, TID_A.1, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ~ID_A, TID_A.1, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+qed
+
+lemma Credential_Leakage_Resistance:
+  all-traces
+  "∀ ID_A ID_B SK #i #j.
+    (((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+      (Insider_GWN( ID_A ) @ #j)) ∧
+     (#j < #i)) ⇒
+    (¬(∃ #k. !Know( SK ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧ (Insider_GWN( ID_A ) @ #j)
+ ∧
+  (#j < #i) ∧ (∃ #k. (!Know( SK ) @ #k))"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ~ID_A, TID_A.1, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ~ID_A, TID_A.1, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  next
+    case A3_SD_B_Respond_Success_case_2
+    solve( !GWN_DB( ID_A, TID_A.2, TID_A_new, T_A, CA_i.1, HA_i, CA_other.1,
+                    HA_other.1
+           ) ▶₀ #j )
+      case A2_GWN_Case1_Normal
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case A2_GWN_Case2_OldAccept
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    next
+      case CSC_To_GWN
+      by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                               h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                               h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                ) @ #k )
+    qed
+  qed
+qed
+
+lemma Device_Capture_Attack:
+  all-traces
+  "∀ ID_A CA_i #j #l.
+    ((Capture_A( ID_A ) @ #j) ∧ (!Know( PUF(ID_A, CA_i) ) @ #l)) ⇒ (#j < #l)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A CA_i #j #l.
+  (Capture_A( ID_A ) @ #j) ∧ (!Know( PUF(ID_A, CA_i) ) @ #l) ∧ ¬(#j < #l)"
+*/
+simplify
+solve( (#j = #l)  ∥ (#l < #j) )
+  case case_1
+  solve( !SD_A_Storage( ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+         ) ▶₀ #j )
+    case A4_SD_A_Confirm_case_01
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_02
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_03
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_04
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_05
+    by solve( !Know( PUF(~ID_A, CA_i.1) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_06
+    by solve( !Know( PUF(~ID_A, CA_i.1) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_07
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_08
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_09
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #j )
+  next
+    case A4_SD_A_Confirm_case_10
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #j )
+  next
+    case R4_SD_A_Response
+    by solve( !Know( PUF(ID_A, CA_i) ) @ #j )
+  qed
+next
+  case case_2
+  solve( !SD_A_Storage( ID_A, TID_A, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+         ) ▶₀ #j )
+    case A4_SD_A_Confirm_case_01
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_02
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_03
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_04
+    by solve( !Know( PUF(ID_A, CA_i.2) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_05
+    by solve( !Know( PUF(~ID_A, CA_i.1) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_06
+    by solve( !Know( PUF(~ID_A, CA_i.1) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_07
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_08
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_09
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #l )
+  next
+    case A4_SD_A_Confirm_case_10
+    by solve( !Know( PUF(ID_A, CA_i.3) ) @ #l )
+  next
+    case R4_SD_A_Response
+    by solve( !Know( PUF(ID_A, CA_i) ) @ #l )
+  qed
+qed
+
+lemma Forward_Secrecy_A:
+  all-traces
+  "∀ ID_A ID_B SK #i #j #k.
+    ((((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+       (Capture_A( ID_A ) @ #j)) ∧
+      (#i < #j)) ∧
+     (!Know( SK ) @ #k)) ⇒
+    (#k < #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j #k.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+  (Capture_A( ID_A ) @ #j) ∧
+  (!Know( SK ) @ #k)
+ ∧
+  (#i < #j) ∧ (¬(#k < #j))"
+*/
+simplify
+solve( (#k = #j)  ∥ (#j < #k) )
+  case case_1
+  solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+    case A2_GWN_Case1_Normal
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldAccept
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_1
+    solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ~ID_A, TID_A.1, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ~ID_A, TID_A.1, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_2
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_3
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  qed
+next
+  case case_2
+  solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+    case A2_GWN_Case1_Normal
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldAccept
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_1
+    solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ~ID_A, TID_A.1, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ~ID_A, TID_A.1, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_2
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_3
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_A_Storage( ID_A, TID_A.2, C_A, MN_A, CA_1, HA_1, CA_2, HA_2
+             ) ▶₀ #j )
+        case A4_SD_A_Confirm_case_01
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_02
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_03
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_04
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_05
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_06
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_07
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_08
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_09
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case A4_SD_A_Confirm_case_10
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      next
+        case R4_SD_A_Response
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+qed
+
+lemma Forward_Secrecy_B:
+  all-traces
+  "∀ ID_A ID_B SK #i #j #k.
+    ((((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+       (Capture_B( ID_B ) @ #j)) ∧
+      (#i < #j)) ∧
+     (!Know( SK ) @ #k)) ⇒
+    (#k < #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #j #k.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+  (Capture_B( ID_B ) @ #j) ∧
+  (!Know( SK ) @ #k)
+ ∧
+  (#i < #j) ∧ (¬(#k < #j))"
+*/
+simplify
+solve( (#k = #j)  ∥ (#j < #k) )
+  case case_1
+  solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+    case A2_GWN_Case1_Normal
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldAccept
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_1
+    solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_2
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_3
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #j )
+      qed
+    qed
+  qed
+next
+  case case_2
+  solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+    case A2_GWN_Case1_Normal
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldAccept
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_1
+    solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_2
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  next
+    case A2_GWN_Case2_OldReject_case_3
+    solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                        h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+           ) ▶₂ #i )
+      case A3_SD_B_Respond_Success_case_1
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    next
+      case A3_SD_B_Respond_Success_case_2
+      solve( !SD_B_Storage( ID_B, CB_1, CB_2, AttrSet_B ) ▶₀ #j )
+        case SD_B_Registration
+        by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                                 h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                                 h(<h(<CB_j, PUF(~ID_B, CB_j)>), ~ID_B, ~T2>)>)
+                  ) @ #k )
+      qed
+    qed
+  qed
+qed
+
+lemma Eavesdropping_Attack:
+  all-traces
+  "∀ ID_A ID_B SK x #i #j.
+    (((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+      (Adv_Eavesdrop_Action( x ) @ #j)) ∧
+     (#j < #i)) ⇒
+    (¬(∃ #k. !Know( SK ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK x #i #j.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧
+  (Adv_Eavesdrop_Action( x ) @ #j)
+ ∧
+  (#j < #i) ∧ (∃ #k. (!Know( SK ) @ #k))"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+qed
+
+lemma Data_Tampering_Resistance:
+  all-traces
+  "∀ ID_A M1 #i #j.
+    (((Out( M1 ) @ #i) ∧ (A2_M1_Verified( ID_A ) @ #j)) ∧ (#i < #j)) ⇒
+    (∃ #k. ((In( M1 ) @ #k) ∧ (#i < #k)) ∧ (#k < #j))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A M1 #i #j.
+  (Out( M1 ) @ #i) ∧ (A2_M1_Verified( ID_A ) @ #j)
+ ∧
+  (#i < #j) ∧ (∀ #k. (In( M1 ) @ #k) ⇒ ((¬(#i < #k)) ∨ (¬(#k < #j))))"
+*/
+simplify
+by solve( Out( M1 ) @ #i )
+
+lemma Tamper_Detection:
+  all-traces
+  "∀ ID_A #i.
+    (Tamper_Detected_Action( ID_A ) @ #i) ⇒
+    (∃ #j. (Auth_Failure_Action( ID_A ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A #i.
+  (Tamper_Detected_Action( ID_A ) @ #i)
+ ∧
+  ∀ #j. (Auth_Failure_Action( ID_A ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( !Failure_Count( ID_A, '3' ) ▶₀ #i )
+  case Tamper_Detection_Failure_Final_case_01
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_02
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_03
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_04
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_05
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_06
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_07
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_08
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_09
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_10
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_11
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_12
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_13
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_14
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_15
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_16
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_17
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_18
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_19
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_20
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_21
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_22
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_23
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_24
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_25
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_26
+  by contradiction /* from formulas */
+next
+  case Tamper_Detection_Failure_Final_case_27
+  by contradiction /* from formulas */
+qed
+
+lemma Session_Key_Security:
+  all-traces
+  "∀ ID_A ID_B SK #i #k.
+    ((A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧ (!Know( SK ) @ #k)) ⇒
+    (∃ #l. (Leak_SK_Action( SK ) @ #l) ∧ (#l < #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ID_A ID_B SK #i #k.
+  (A4_Confirmed_Action( ID_A, ID_B, SK ) @ #i) ∧ (!Know( SK ) @ #k)
+ ∧
+  ∀ #l. (Leak_SK_Action( SK ) @ #l) ⇒ ¬(#l < #k)"
+*/
+simplify
+solve( !Session_A1_Used( ID_A, TID_A, r1, T1 ) ▶₁ #i )
+  case A2_GWN_Case1_Normal
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldAccept
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_1
+  solve( !Session_A3( ID_B, ~ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<~ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(~ID_A, CA_i)>), ~ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_2
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+next
+  case A2_GWN_Case2_OldReject_case_3
+  solve( !Session_A3( ID_B, ID_A, recovered_S2,
+                      h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), PB_j, r2, T2, T3
+         ) ▶₂ #i )
+    case A3_SD_B_Respond_Success_case_1
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  next
+    case A3_SD_B_Respond_Success_case_2
+    by solve( !Know( hprime(<~T4, Xor(L1, h(<ID_A, TID_A, T1>)), ~r2, 
+                             h(<h(<CA_i, PUF(ID_A, CA_i)>), ID_A, T1>), 
+                             h(<h(<CB_j, PUF(ID_B, CB_j)>), ID_B, ~T2>)>)
+              ) @ #k )
+  qed
+qed
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.12.0
+Maude version 3.5.1
+Git revision: 82780bbaf3328a45f624ddb41e51bf75425f851c (with uncommited changes), branch: master
+Compiled at: 2026-03-07 14:22:39.174278293 UTC
+*/
+
+end
+
+==============================================================================
+summary of summaries:
+
+analyzed: rlaka.spthy
+
+  processing time: 36.22s
+  
+  Man_in_the_Middle_Attack (all-traces): verified (87 steps)
+  Replay_Attack (all-traces): verified (1 steps)
+  Impersonation_Attack (all-traces): verified (28 steps)
+  Privileged_Insider_Attack_RC (all-traces): verified (27 steps)
+  Privileged_Insider_Attack_GWN (all-traces): verified (47 steps)
+  Credential_Leakage_Resistance (all-traces): verified (47 steps)
+  Device_Capture_Attack (all-traces): verified (26 steps)
+  Forward_Secrecy_A (all-traces): verified (254 steps)
+  Forward_Secrecy_B (all-traces): verified (54 steps)
+  Eavesdropping_Attack (all-traces): verified (17 steps)
+  Data_Tampering_Resistance (all-traces): verified (2 steps)
+  Tamper_Detection (all-traces): verified (29 steps)
+  Session_Key_Security (all-traces): verified (17 steps)
+
+==============================================================================
