@@ -1,3 +1,0 @@
-N=2: mean=21.98684387, std=2.00220811, p95=25.28372223; Table S5 match=True
-N=3: mean=31.99709791, std=2.99957116, p95=36.94426543; Table S5 match=True
-N=4: mean=42.01410456, std=3.99653428, p95=48.59886902; Table S5 match=True
