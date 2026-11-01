@@ -1,0 +1,6 @@
+N,p,analytical_alert_probability,expected_count_per_100000_windows
+3,0.05,6.25e-06,0.625
+3,0.1,0.0001,10
+3,0.2,0.0016,160
+3,0.3,0.0081,810
+3,0.5,0.0625,6250
